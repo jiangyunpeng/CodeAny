@@ -24,9 +24,11 @@ describe("runAgentLoop", () => {
     await fs.writeFile(path.join(workspaceRoot, "src", "index.ts"), "export const value = 1;\n", "utf8");
 
     let callCount = 0;
+    let capturedSystem = "";
     const provider = createAnthropicProvider({
       apiKey: "test",
-      streamFactory: async function* () {
+      streamFactory: async function* (input) {
+        capturedSystem = input.system ?? "";
         if (callCount === 0) {
           callCount += 1;
           yield {
@@ -63,5 +65,7 @@ describe("runAgentLoop", () => {
 
     expect(result.toolCalls).toEqual(["read_file"]);
     expect(result.finalText).toContain("src/index.ts");
+    expect(capturedSystem).toContain("Use search_code to find candidate paths");
+    expect(capturedSystem).toContain("Dangerous actions include write_file and run_shell");
   });
 });

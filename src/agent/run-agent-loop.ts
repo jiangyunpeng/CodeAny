@@ -2,6 +2,8 @@ import { buildMessages, buildToolResultMessage, buildUserMessage } from "../cont
 import { shapeTask } from "./task-shaper";
 import { shouldUseExplore } from "./context-planner";
 import { appendMessage, appendToolResult, type SessionState } from "./session";
+import { MAIN_AGENT_SYSTEM_PROMPT } from "./system-prompts";
+import { runExploreAgent } from "./subagents/explore-agent";
 import type { ExploreReport } from "./subagents/explore-contract";
 import type { Provider } from "../provider/anthropic";
 import type { ToolContext, ToolName, ToolRegistry } from "../tools/registry";
@@ -13,7 +15,7 @@ export type RunAgentLoopInput = {
   provider: Provider;
   registry: ToolRegistry;
   toolContext: ToolContext;
-  exploreAgent?: (prompt: string, ctx: ToolContext) => Promise<ExploreReport>;
+  exploreAgent?: (prompt: string, ctx: ToolContext, provider: Provider, model: string) => Promise<ExploreReport>;
   maxIterations?: number;
 };
 
@@ -32,9 +34,15 @@ export async function runAgentLoop(input: RunAgentLoopInput): Promise<RunAgentLo
   const toolCalls: string[] = [];
   const messagesSentToMainModel: string[] = [];
   const budgetManager = input.toolContext.budgetManager ?? new ContextBudgetManager();
+  const exploreAgent = input.exploreAgent ?? runExploreAgent;
 
-  if (input.exploreAgent && shouldUseExplore({ userInput: input.prompt })) {
-    const report = await input.exploreAgent(task.rewrittenTask, input.toolContext);
+  if (shouldUseExplore({ userInput: input.prompt })) {
+    const report = await exploreAgent(
+      task.rewrittenTask,
+      input.toolContext,
+      input.provider,
+      input.session.exploreModel ?? input.session.model,
+    );
     usedExplore = true;
     session = {
       ...session,
@@ -57,6 +65,7 @@ export async function runAgentLoop(input: RunAgentLoopInput): Promise<RunAgentLo
     const response = await input.provider.send({
       model: session.model,
       messages,
+      system: MAIN_AGENT_SYSTEM_PROMPT,
     });
 
     let sawToolUse = false;

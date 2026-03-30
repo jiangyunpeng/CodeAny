@@ -149,6 +149,7 @@ export function createDefaultReplRuntime(overrides?: Partial<ReplRuntime>): Repl
   const session = overrides?.session ?? createSessionState({
     cwd: toolContext.workspaceRoot,
     model: "claude-3-7-sonnet-latest",
+    exploreModel: "claude-3-5-haiku-latest",
     approvalMode: toolContext.approvalMode,
   });
 

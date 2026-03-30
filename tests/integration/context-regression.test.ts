@@ -27,6 +27,25 @@ describe("context regression", () => {
         if (callCount === 0) {
           callCount += 1;
           yield {
+            type: "content_block_delta",
+            delta: {
+              type: "text_delta",
+              text: JSON.stringify({
+                rewrittenTask: "Search logs",
+                keyQuestions: ["Where do logs come from?"],
+                candidatePaths: [],
+                searchSummary: [],
+                recommendedNextReads: [],
+                risks: [],
+              }),
+            },
+          };
+          yield { type: "message_stop" };
+          return;
+        }
+        if (callCount === 1) {
+          callCount += 1;
+          yield {
             type: "content_block_start",
             content_block: {
               type: "tool_use",
@@ -56,14 +75,6 @@ describe("context regression", () => {
         workspaceRoot,
         approvalMode: "never",
         budgetManager: new ContextBudgetManager({ maxShellChars: 120 }),
-      }),
-      exploreAgent: async () => ({
-        rewrittenTask: "Search logs",
-        keyQuestions: ["Where do logs come from?"],
-        candidatePaths: [],
-        searchSummary: [],
-        recommendedNextReads: [],
-        risks: [],
       }),
     });
 

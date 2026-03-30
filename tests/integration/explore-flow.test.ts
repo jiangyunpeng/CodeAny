@@ -23,9 +23,44 @@ describe("explore flow", () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(path.join(workspaceRoot, "src", "chart.ts"), "const raw = 'raw grep noise';\n", "utf8");
 
+    let callCount = 0;
+    const seenSystems: string[] = [];
     const provider = createAnthropicProvider({
       apiKey: "test",
-      streamFactory: async function* () {
+      streamFactory: async function* (input) {
+        seenSystems.push(input.system ?? "");
+        if (callCount === 0) {
+          callCount += 1;
+          yield {
+            type: "content_block_start",
+            content_block: {
+              type: "tool_use",
+              name: "search_code",
+              input: { query: "chart", maxResults: 5 },
+            },
+          };
+          yield { type: "message_stop" };
+          return;
+        }
+        if (callCount === 1) {
+          callCount += 1;
+          yield {
+            type: "content_block_delta",
+            delta: {
+              type: "text_delta",
+              text: JSON.stringify({
+                rewrittenTask: "Search the codebase thoroughly",
+                keyQuestions: ["Where is the entrypoint?"],
+                candidatePaths: [{ path: "src/chart.ts", reason: "relevant", confidence: 0.8 }],
+                searchSummary: [{ tool: "search_code", query: "chart", findings: ["src/chart.ts:1"], truncated: false }],
+                recommendedNextReads: [{ path: "src/chart.ts", startLine: 1, endLine: 3, reason: "inspect chart" }],
+                risks: [],
+              }),
+            },
+          };
+          yield { type: "message_stop" };
+          return;
+        }
         yield { type: "content_block_delta", delta: { type: "text_delta", text: "done" } };
         yield { type: "message_stop" };
       },
@@ -44,17 +79,10 @@ describe("explore flow", () => {
         workspaceRoot,
         approvalMode: "default",
       }),
-      exploreAgent: async () => ({
-        rewrittenTask: "Search the codebase thoroughly",
-        keyQuestions: ["Where is the entrypoint?"],
-        candidatePaths: [{ path: "src/chart.ts", reason: "relevant", confidence: 0.8 }],
-        searchSummary: [{ tool: "search_code", query: "chart", findings: ["src/chart.ts:1"], truncated: false }],
-        recommendedNextReads: [{ path: "src/chart.ts", startLine: 1, endLine: 3, reason: "inspect chart" }],
-        risks: [],
-      }),
     });
 
     expect(result.usedExplore).toBe(true);
     expect(result.messagesSentToMainModel.join("\n")).not.toContain("raw grep noise");
+    expect(seenSystems[0]).toContain("read-only");
   });
 });

@@ -11,6 +11,7 @@ export type AgentMessage = {
 export type SessionState = {
   cwd: string;
   model: string;
+  exploreModel?: string;
   approvalMode: ApprovalMode;
   messages: AgentMessage[];
   latestExploreReport?: ExploreReport;
@@ -21,11 +22,13 @@ export type SessionState = {
 export function createSessionState(input: {
   cwd: string;
   model: string;
+  exploreModel?: string;
   approvalMode: ApprovalMode;
 }): SessionState {
   return {
     cwd: input.cwd,
     model: input.model,
+    exploreModel: input.exploreModel,
     approvalMode: input.approvalMode,
     messages: [],
     recentToolResults: [],

@@ -21,9 +21,15 @@ type StreamFactory = (input: ProviderSendInput) => AsyncIterable<unknown>;
 
 export function createAnthropicProvider(input: {
   apiKey: string;
+  authToken?: string;
+  baseURL?: string;
   streamFactory?: StreamFactory;
 }): Provider {
-  const streamFactory = input.streamFactory ?? createSdkStreamFactory(input.apiKey);
+  const streamFactory = input.streamFactory ?? createSdkStreamFactory({
+    apiKey: input.apiKey,
+    authToken: input.authToken,
+    baseURL: input.baseURL,
+  });
   return {
     async send(request) {
       const source = streamFactory(request);
@@ -40,8 +46,16 @@ export function createAnthropicProvider(input: {
   };
 }
 
-function createSdkStreamFactory(apiKey: string): StreamFactory {
-  const client = new Anthropic({ apiKey });
+function createSdkStreamFactory(input: {
+  apiKey: string;
+  authToken?: string;
+  baseURL?: string;
+}): StreamFactory {
+  const client = new Anthropic({
+    apiKey: input.apiKey || null,
+    authToken: input.authToken || null,
+    baseURL: input.baseURL || undefined,
+  });
   return (input) =>
     client.messages.stream({
       model: input.model,
