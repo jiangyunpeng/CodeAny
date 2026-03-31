@@ -224,4 +224,4 @@ npm run build
 
 ## License
 
-No license file has been added yet. If you plan to open source this repository, add a license before publishing.
+MIT
