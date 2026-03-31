@@ -1,7 +1,8 @@
 import readline from "node:readline/promises";
 
 import { BUILT_IN_COMMANDS, parseCliCommand } from "./commands";
-import { renderStatusLine, renderToolSummary } from "./render";
+import { renderProgressLine, renderStatusLine, renderToolSummary } from "./render";
+import type { AgentProgressEvent } from "../agent/progress";
 import { createSessionState, type SessionState } from "../agent/session";
 import { diffWorkspaceTool } from "../tools/diff-workspace";
 import { createDefaultToolContext, createToolRegistry, type ToolContext, type ToolRegistry } from "../tools/registry";
@@ -15,6 +16,7 @@ export type ReplRuntime = {
   toolContext: ToolContext;
   provider: Provider;
   yolo: boolean;
+  onProgressLine?: (line: string, event: AgentProgressEvent) => void;
 };
 
 export async function handleCommand(
@@ -76,6 +78,9 @@ export async function handleInputLine(
     registry: runtime.registry,
     toolContext: runtime.toolContext,
     exploreAgent: runExploreAgent,
+    onProgress: (event) => {
+      runtime.onProgressLine?.(renderProgressLine(event), event);
+    },
   });
 
   return {
@@ -94,6 +99,12 @@ export async function runReplScript(
     approvalMode: runtime.session.approvalMode,
     yolo: runtime.yolo,
   })];
+  runtime = {
+    ...runtime,
+    onProgressLine: overrides?.onProgressLine ?? ((line) => {
+      outputs.push(line);
+    }),
+  };
 
   for (const input of inputs) {
     const result = await handleInputLine(input, runtime);
@@ -117,6 +128,12 @@ export async function runInteractiveRepl(runtime: ReplRuntime): Promise<void> {
   });
 
   let currentRuntime = runtime;
+  currentRuntime = {
+    ...currentRuntime,
+    onProgressLine: runtime.onProgressLine ?? ((line) => {
+      console.log(line);
+    }),
+  };
   console.log(renderStatusLine({
     model: runtime.session.model,
     approvalMode: runtime.session.approvalMode,

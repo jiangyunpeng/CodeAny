@@ -22,16 +22,60 @@ function toModelSafeMetadata(metadata: Record<string, unknown> | undefined): Rec
   );
 }
 
-export function buildToolResultMessage(input: ToolResultEnvelope): AgentMessage {
+export function buildToolResultMessage(input: ToolResultEnvelope, toolUseId?: string): AgentMessage {
   return {
     role: "tool",
     name: input.toolName,
+    toolUseId,
+    providerContent: toolUseId ? [{
+      type: "tool_result",
+      tool_use_id: toolUseId,
+      content: JSON.stringify({
+        status: input.status,
+        summary: input.modelVisibleOutput,
+        truncation: input.truncation,
+        metadata: toModelSafeMetadata(input.metadata),
+      }),
+    }] : undefined,
     content: JSON.stringify({
       status: input.status,
       summary: input.modelVisibleOutput,
       truncation: input.truncation,
       metadata: toModelSafeMetadata(input.metadata),
     }),
+  };
+}
+
+export function buildAssistantToolUseMessage(input: {
+  toolUseId: string;
+  name: string;
+  input: unknown;
+  preambleText?: string;
+}): AgentMessage {
+  const providerContent: Array<Record<string, unknown>> = [];
+  if (input.preambleText?.trim()) {
+    providerContent.push({
+      type: "text",
+      text: input.preambleText,
+    });
+  }
+  providerContent.push({
+    type: "tool_use",
+    id: input.toolUseId,
+    name: input.name,
+    input: input.input as Record<string, unknown>,
+  });
+
+  return {
+    role: "assistant",
+    content: input.preambleText?.trim()
+      ? input.preambleText
+      : JSON.stringify({
+        toolUseId: input.toolUseId,
+        toolName: input.name,
+        toolInput: input.input,
+      }),
+    providerContent,
   };
 }
 

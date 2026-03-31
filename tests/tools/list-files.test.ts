@@ -36,4 +36,33 @@ describe("listFilesTool", () => {
     expect(result.returnedCount).toBe(1);
     expect(result.truncated).toBe(true);
   });
+
+  it("finds files in deep Java-style package directories by default", async () => {
+    workspaceRoot = await createTempWorkspace();
+    const nestedDir = path.join(
+      workspaceRoot,
+      "console",
+      "src",
+      "main",
+      "java",
+      "com",
+      "wacai",
+      "middleware",
+      "quantum",
+      "controller",
+    );
+    await fs.mkdir(nestedDir, { recursive: true });
+    await fs.writeFile(path.join(nestedDir, "EndpointDetailController.java"), "class EndpointDetailController {}\n", "utf8");
+
+    const result = await listFilesTool(
+      { path: "." },
+      createDefaultToolContext({
+        workspaceRoot,
+        approvalMode: "default",
+      }),
+    );
+
+    expect(result.totalCount).toBe(1);
+    expect(result.entries).toContain("console/src/main/java/com/wacai/middleware/quantum/controller/EndpointDetailController.java");
+  });
 });

@@ -1,12 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-import { mapAnthropicEvent, type ProviderEvent } from "./stream";
+import { mapAnthropicStreamEvents, type ProviderEvent } from "./stream";
 import type { AgentMessage } from "../agent/session";
+import type { ToolDefinition } from "../tools/registry";
 
 export type ProviderSendInput = {
   model: string;
   messages: AgentMessage[];
   system?: string;
+  tools?: ToolDefinition[];
 };
 
 export type ProviderResponse = {
@@ -34,13 +36,7 @@ export function createAnthropicProvider(input: {
     async send(request) {
       const source = streamFactory(request);
       return {
-        events: (async function* () {
-          for await (const event of source) {
-            for (const mapped of mapAnthropicEvent(event as never)) {
-              yield mapped;
-            }
-          }
-        })(),
+        events: mapAnthropicStreamEvents(source as AsyncIterable<never>),
       };
     },
   };
@@ -61,9 +57,19 @@ function createSdkStreamFactory(input: {
       model: input.model,
       max_tokens: 2_048,
       system: input.system,
-      messages: input.messages.map((message) => ({
-        role: message.role === "tool" ? "user" : message.role,
-        content: message.content,
+      messages: input.messages.map((message) => {
+        return {
+          role: message.role === "tool" ? "user" : message.role,
+          content: (message.providerContent ?? message.content) as Anthropic.MessageParam["content"],
+        };
+      }),
+      tools: input.tools?.map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        input_schema: tool.inputSchema,
       })),
+      tool_choice: input.tools?.length
+        ? { type: "auto", disable_parallel_tool_use: true }
+        : undefined,
     });
 }

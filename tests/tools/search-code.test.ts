@@ -33,4 +33,40 @@ describe("searchCodeTool", () => {
     expect(result.truncated).toBe(true);
     expect(result.matches[0]).toMatchObject({ path: expect.any(String), line: expect.any(Number) });
   });
+
+  it("searches deep Java-style package directories by default", async () => {
+    workspaceRoot = await createTempWorkspace();
+    const nestedDir = path.join(
+      workspaceRoot,
+      "console",
+      "src",
+      "main",
+      "java",
+      "com",
+      "wacai",
+      "middleware",
+      "quantum",
+      "controller",
+    );
+    await fs.mkdir(nestedDir, { recursive: true });
+    await fs.writeFile(
+      path.join(nestedDir, "EndpointDetailController.java"),
+      "public class EndpointDetailController { WebResponse queryLine() { return null; } }\n",
+      "utf8",
+    );
+
+    const result = await searchCodeTool(
+      { query: "queryLine" },
+      createDefaultToolContext({
+        workspaceRoot,
+        approvalMode: "default",
+      }),
+    );
+
+    expect(result.totalMatches).toBe(1);
+    expect(result.matches[0]).toMatchObject({
+      path: "console/src/main/java/com/wacai/middleware/quantum/controller/EndpointDetailController.java",
+      line: 1,
+    });
+  });
 });

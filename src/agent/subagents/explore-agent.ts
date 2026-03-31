@@ -1,3 +1,4 @@
+import type { AgentProgressListener } from "../progress";
 import type { Provider } from "../../provider/anthropic";
 import type { ToolContext } from "../../tools/registry";
 import type { ExploreReport } from "./explore-contract";
@@ -8,11 +9,13 @@ export async function runExploreAgent(
   ctx: ToolContext,
   provider: Provider,
   model: string,
+  onProgress?: AgentProgressListener,
 ): Promise<ExploreReport> {
   return runExploreSubagent({
     prompt: userInput,
     model,
     provider,
+    onProgress,
     toolContext: {
       ...ctx,
       approvalMode: "never",

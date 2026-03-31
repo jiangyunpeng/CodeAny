@@ -47,17 +47,20 @@ describe("context regression", () => {
           callCount += 1;
           yield {
             type: "content_block_start",
+            index: 0,
             content_block: {
               type: "tool_use",
+              id: "toolu_run_shell",
               name: "run_shell",
               input: { command: "printf 'VERY_LONG_RAW_OUTPUT_BLOCK%.0s' {1..300}" },
             },
           };
+          yield { type: "content_block_stop", index: 0 };
           yield { type: "message_stop" };
           return;
         }
 
-        yield { type: "content_block_delta", delta: { type: "text_delta", text: "final" } };
+        yield { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "final" } };
         yield { type: "message_stop" };
       },
     });

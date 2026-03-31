@@ -1,7 +1,8 @@
-import { buildMessages, buildToolResultMessage, buildUserMessage } from "../../context/message-builder";
+import { buildAssistantToolUseMessage, buildMessages, buildToolResultMessage, buildUserMessage } from "../../context/message-builder";
 import { ContextBudgetManager } from "../../context/budget-manager";
 import type { Provider } from "../../provider/anthropic";
 import type { ToolContext, ToolName } from "../../tools/registry";
+import type { AgentProgressListener } from "../progress";
 import { shapeTask } from "../task-shaper";
 import { EXPLORE_AGENT_SYSTEM_PROMPT } from "../system-prompts";
 import type { ExploreReport } from "./explore-contract";
@@ -14,6 +15,7 @@ export async function runExploreSubagent(input: {
   model: string;
   provider: Provider;
   toolContext: ToolContext;
+  onProgress?: AgentProgressListener;
   maxIterations?: number;
 }): Promise<ExploreReport> {
   const task = shapeTask(input.prompt);
@@ -28,10 +30,15 @@ export async function runExploreSubagent(input: {
   const maxIterations = input.maxIterations ?? 6;
 
   for (let iteration = 0; iteration < maxIterations; iteration += 1) {
+    input.onProgress?.({
+      type: "pending",
+      scope: "explore",
+    });
     const response = await input.provider.send({
       model: input.model,
       messages: buildMessages(messages, budgetManager),
       system: EXPLORE_AGENT_SYSTEM_PROMPT,
+      tools: registry.listDefinitions(),
     });
 
     let sawToolUse = false;
@@ -45,11 +52,30 @@ export async function runExploreSubagent(input: {
 
       if (event.type === "tool_use") {
         sawToolUse = true;
-        const toolResult = await registry.execute(event.name as ToolName, event.input, {
+        const toolName = event.name as ToolName;
+        input.onProgress?.({
+          type: "tool_start",
+          scope: "explore",
+          toolName,
+          input: event.input,
+        });
+        messages = [...messages, buildAssistantToolUseMessage({
+          ...event,
+          preambleText: outputText,
+        })];
+        const toolResult = await registry.execute(toolName, event.input, {
           ...input.toolContext,
           approvalMode: "never",
         });
-        messages = [...messages, buildToolResultMessage(toolResult)];
+        input.onProgress?.({
+          type: "tool_done",
+          scope: "explore",
+          toolName,
+          input: event.input,
+          result: toolResult,
+        });
+        messages = [...messages, buildToolResultMessage(toolResult, event.toolUseId)];
+        outputText = "";
       }
     }
 

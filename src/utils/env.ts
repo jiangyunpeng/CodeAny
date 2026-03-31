@@ -1,3 +1,5 @@
+import { realpathSync } from "node:fs";
+
 import { config as loadDotenv } from "dotenv";
 
 import { ApprovalMode } from "../agent/approval";
@@ -50,9 +52,26 @@ export function loadAppConfig(options: {
       ?? "claude-3-7-sonnet-latest",
     exploreModel: readConfigValue(env, dotenvEnv, "EXPLORE_MODEL") ?? "claude-3-5-haiku-latest",
     approvalMode: yolo ? "never" : approvalMode,
-    cwd: flags.cwd ?? options.cwd,
+    cwd: flags.cwd ?? resolveDefaultWorkspaceRoot(options.cwd, env),
     yolo,
   };
+}
+
+function resolveDefaultWorkspaceRoot(cwd: string, env: NodeJS.ProcessEnv): string {
+  const pwd = env.PWD;
+  if (!pwd) {
+    return cwd;
+  }
+
+  try {
+    if (realpathSync.native(pwd) === realpathSync.native(cwd)) {
+      return pwd;
+    }
+  } catch {
+    return cwd;
+  }
+
+  return cwd;
 }
 
 function readConfigValue(

@@ -6,6 +6,8 @@ export type AgentMessage = {
   role: "user" | "assistant" | "tool";
   content: string;
   name?: string;
+  toolUseId?: string;
+  providerContent?: string | Array<Record<string, unknown>>;
 };
 
 export type SessionState = {

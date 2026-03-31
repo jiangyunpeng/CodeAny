@@ -32,18 +32,22 @@ describe("runExploreSubagent", () => {
           callCount += 1;
           yield {
             type: "content_block_start",
+            index: 0,
             content_block: {
               type: "tool_use",
+              id: "toolu_search_code",
               name: "search_code",
               input: { query: "chart", maxResults: 5 },
             },
           };
+          yield { type: "content_block_stop", index: 0 };
           yield { type: "message_stop" };
           return;
         }
 
         yield {
           type: "content_block_delta",
+          index: 0,
           delta: {
             type: "text_delta",
             text: JSON.stringify({

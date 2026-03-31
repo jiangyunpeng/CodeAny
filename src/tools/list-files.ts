@@ -22,7 +22,7 @@ export async function listFilesTool(input: ListFilesInput, ctx: ToolContext): Pr
   const entries = await listWorkspaceFiles({
     workspaceRoot: ctx.workspaceRoot,
     targetPath: input.path,
-    maxDepth: input.maxDepth ?? 3,
+    maxDepth: input.maxDepth ?? 12,
     glob: input.glob,
   });
   const compressed = compressFileList(entries, ctx.budgetManager.budgets.maxHistoryMessages);

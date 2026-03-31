@@ -26,6 +26,17 @@ export type ToolResultEnvelope = {
   metadata?: Record<string, unknown>;
 };
 
+export type ToolDefinition = {
+  name: ToolName;
+  description: string;
+  inputSchema: {
+    type: "object";
+    properties: Record<string, { type: string; description?: string }>;
+    required?: string[];
+    additionalProperties?: boolean;
+  };
+};
+
 export type ShellRunner = {
   run: (command: string, options: { cwd: string; timeoutMs?: number }) => Promise<CommandResult>;
 };
@@ -50,6 +61,10 @@ export class ToolRegistry {
     return Array.from(this.tools.keys());
   }
 
+  listDefinitions(): ToolDefinition[] {
+    return this.list().map((name) => TOOL_DEFINITIONS[name]);
+  }
+
   async execute(name: ToolName, input: unknown, ctx: ToolContext): Promise<ToolResultEnvelope> {
     const tool = this.tools.get(name);
     if (!tool) {
@@ -68,6 +83,85 @@ export class ToolRegistry {
     return tool(input, ctx);
   }
 }
+
+const TOOL_DEFINITIONS: Record<ToolName, ToolDefinition> = {
+  list_files: {
+    name: "list_files",
+    description: "List files inside the current workspace, optionally narrowed by path, depth, or glob.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Optional path inside the workspace to start listing from." },
+        maxDepth: { type: "integer", description: "Maximum directory depth to traverse." },
+        glob: { type: "string", description: "Optional glob pattern to filter returned files." },
+      },
+      additionalProperties: false,
+    },
+  },
+  read_file: {
+    name: "read_file",
+    description: "Read a file from the workspace, optionally restricting the returned line range.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Path to the file inside the workspace." },
+        startLine: { type: "integer", description: "1-based starting line number." },
+        endLine: { type: "integer", description: "1-based ending line number." },
+      },
+      required: ["path"],
+      additionalProperties: false,
+    },
+  },
+  search_code: {
+    name: "search_code",
+    description: "Search workspace files for a literal text query and return matching file paths and line previews.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Literal text to search for." },
+        maxResults: { type: "integer", description: "Maximum number of matches to return." },
+        glob: { type: "string", description: "Optional glob filter for candidate files." },
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
+  },
+  write_file: {
+    name: "write_file",
+    description: "Write text content to a workspace file, creating parent directories when needed.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Path to the file inside the workspace." },
+        content: { type: "string", description: "Full file content to write." },
+      },
+      required: ["path", "content"],
+      additionalProperties: false,
+    },
+  },
+  run_shell: {
+    name: "run_shell",
+    description: "Run a shell command with the workspace root as the working directory.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        command: { type: "string", description: "Shell command to execute." },
+        timeoutMs: { type: "integer", description: "Optional timeout in milliseconds." },
+      },
+      required: ["command"],
+      additionalProperties: false,
+    },
+  },
+  diff_workspace: {
+    name: "diff_workspace",
+    description: "Show a git diff summary for the current workspace.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+};
 
 export function createDefaultToolContext(input: {
   workspaceRoot: string;

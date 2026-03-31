@@ -26,7 +26,7 @@ export type SearchCodeResult = {
 export async function searchCodeTool(input: SearchCodeInput, ctx: ToolContext): Promise<SearchCodeResult> {
   const files = await listWorkspaceFiles({
     workspaceRoot: ctx.workspaceRoot,
-    maxDepth: 8,
+    maxDepth: 12,
     glob: input.glob,
   });
   const matches: Array<{ path: string; line: number; preview: string }> = [];
