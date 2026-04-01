@@ -1,226 +1,86 @@
 # code-any
 
-A local TypeScript coding agent for the terminal, designed around a Claude Code-like workflow.
+[中文版](README.zh-CN.md)
 
-It provides a REPL-style CLI, Anthropic streaming support, local tool calling, workspace file editing, shell execution, an `Explore` subagent for context gathering, and explicit context-budget controls to avoid flooding the model with raw tool output.
+A terminal-based coding agent built in TypeScript — a Claude Code-like workflow you can run locally.
 
-## Status
+<p align="center">
+  <img src="assets/demo.png" alt="code-any demo" width="800" />
+</p>
 
-Current branch: `main`
+## What is this?
 
-Verified on the current codebase:
+This project demonstrates how a Claude Code-style agent works under the hood:
 
-- `npm test` ✅
-- `npm run build` ✅
+- **Agent loop** — iterative tool-use rounds with the Anthropic API
+- **Context engineering** — budget-aware truncation so large outputs don't flood the model
+- **Explore subagent** — a cheap read-only pass to gather context before the main agent acts
+- **Tool output separation** — raw output stays local, only structured summaries go to the model
 
-## Features
-
-- REPL-style terminal interaction
-- Anthropic Messages API streaming adapter
-- Agent loop with tool execution
-- Six built-in local tools:
-  - `list_files`
-  - `read_file`
-  - `search_code`
-  - `write_file`
-  - `run_shell`
-  - `diff_workspace`
-- `Explore` subagent for broad context collection before main-agent reasoning
-- Context budgeting and truncation protocol
-- Separation between raw tool output and model-visible output
-- Default approval mode for risky actions
-- `--yolo` mode for auto-approved file writes and shell execution
-- Slash commands including `/help`, `/tools`, `/model`, `/approval`, `/diff`, `/clear`, `/exit`
-
-## Why This Exists
-
-Most terminal agents become noisy and fragile once search results, shell logs, or diffs get large. This project treats context engineering as a first-class concern:
-
-- search is for locating, not for dumping full code into the model
-- reading is done through focused file slices
-- high-noise tools return bounded, structured summaries
-- complex requests can be routed through `Explore` first
-- raw output stays available locally without being blindly forwarded to the model
+If you've ever wondered "how does Claude Code actually work?", read the source.
 
 ## Quick Start
 
-### Requirements
-
-- Node.js 20+
-- An Anthropic API key
-
-### Install
-
 ```bash
-npm install
-```
+# Install
+npm install && npm run build && npm link
 
-Build the executable bundle:
+# Configure
+cp .env.example .env
+# Set ANTHROPIC_AUTH_TOKEN=your_token_here in .env
 
-```bash
-npm run build
-```
-
-Link it as a local global command:
-
-```bash
-npm link
-```
-
-Then run:
-
-```bash
+# Run
 code-any
 ```
 
-### Configure
+### CLI Flags
 
 ```bash
-cp .env.example .env
+code-any --model claude-3-7-sonnet-latest  # choose model
+code-any --cwd /path/to/workspace          # set working directory
+code-any --yolo                            # auto-approve all tool calls
 ```
 
-Set at least:
+### Slash Commands
+
+| Command     | Description              |
+|-------------|--------------------------|
+| `/help`     | Show built-in commands   |
+| `/tools`    | List available tools     |
+| `/model`    | Show current model       |
+| `/approval` | Show approval mode       |
+| `/diff`     | Show workspace diff      |
+| `/clear`    | Clear conversation       |
+| `/exit`     | Exit                     |
+
+## Built-in Tools
+
+| Tool             | Description                        |
+|------------------|------------------------------------|
+| `list_files`     | List files in a directory          |
+| `read_file`      | Read file content (with slicing)   |
+| `search_code`    | Ripgrep-based code search          |
+| `write_file`     | Write/create files (needs approval)|
+| `run_shell`      | Execute shell commands (needs approval)|
+| `diff_workspace` | Show workspace changes             |
+
+## Configuration
 
 ```bash
-ANTHROPIC_AUTH_TOKEN=your_token_here
+ANTHROPIC_AUTH_TOKEN=your_token_here        # required
+ANTHROPIC_MODEL=claude-3-7-sonnet-latest    # main model (default)
+EXPLORE_MODEL=claude-3-5-haiku-latest       # explore subagent model (default)
+DEFAULT_APPROVAL=default                    # or "never" for yolo mode
 ```
 
-Optional configuration:
+## For Developers
 
 ```bash
-ANTHROPIC_API_KEY=your_api_key_here
-ANTHROPIC_BASE_URL=https://api.anthropic.com
-ANTHROPIC_MODEL=claude-3-7-sonnet-latest
-EXPLORE_MODEL=claude-3-5-haiku-latest
-DEFAULT_APPROVAL=default
+npm run dev        # Run in development mode
+npm test           # Run tests
+npm run typecheck  # Type check only
+npm run build      # Build bundle
 ```
-
-Configuration precedence:
-
-- runtime environment variables first
-- `.env` file second
-
-### Run
-
-```bash
-npm run dev
-```
-
-Show help:
-
-```bash
-code-any --help
-```
-
-Show version:
-
-```bash
-code-any --version
-```
-
-Run with explicit flags:
-
-```bash
-npm run dev -- --model claude-3-7-sonnet-latest --cwd /path/to/workspace
-```
-
-Run in YOLO mode:
-
-```bash
-npm run dev -- --yolo
-```
-
-## CLI Commands
-
-- `/help` show built-in commands
-- `/tools` list available tools
-- `/model` show current model
-- `/approval` show current approval mode
-- `/diff` show workspace diff summary
-- `/clear` clear in-memory conversation state
-- `/exit` exit the REPL
-
-## Project Structure
-
-```text
-src/
-  cli/        REPL, command parsing, rendering
-  agent/      task shaping, approval, session, agent loop, explore subagent
-  context/    truncation, compression, budget management, message building
-  provider/   Anthropic stream adapter
-  tools/      local tools and tool registry
-  utils/      filesystem, path, env, process helpers
-tests/
-  cli/
-  agent/
-  context/
-  provider/
-  tools/
-  integration/
-```
-
-## Architecture Notes
-
-### 1. Tool output is not model input
-
-Each high-noise tool is expected to keep raw output and model-visible output separate.
-
-### 2. Search narrows, read deepens
-
-`search_code` is intended to identify candidate paths and snippets. Detailed inspection should happen through `read_file`.
-
-### 3. Explore first on broad tasks
-
-For broad or ambiguous requests, the main agent can use `Explore` to gather candidate files, queries, and next reads before spending main-model budget.
-
-### 4. Context budgets are explicit
-
-Large outputs are truncated with metadata rather than silently chopped. The model gets bounded summaries plus truncation hints.
-
-## Development
-
-Install dependencies:
-
-```bash
-npm install
-```
-
-Run tests:
-
-```bash
-npm test
-```
-
-Run type-check:
-
-```bash
-npm run typecheck
-```
-
-Rebuild CLI bundle:
-
-```bash
-npm run build
-```
-
-## Current Limitations
-
-- Anthropic is the only provider implemented
-- This is a local CLI, not a web app
-- No browser automation
-- No remote sandbox execution
-- No automatic git commit flow from the agent itself
-- Session persistence is still minimal and file-backed persistence is not implemented yet
-- The `Explore` model selection is configured conceptually, but the current implementation focuses on contract and flow rather than full multi-model routing
-
-## Roadmap
-
-- persistent session storage
-- richer approval UX
-- stronger tool schemas and validation
-- better diff rendering for large workspaces
-- more robust provider event handling
-- configurable tool budgets and explore thresholds
 
 ## License
 
