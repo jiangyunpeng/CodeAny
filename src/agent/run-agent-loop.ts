@@ -25,6 +25,7 @@ export type RunAgentLoopInput = {
     onProgress?: AgentProgressListener,
   ) => Promise<ExploreReport>;
   maxIterations?: number;
+  debug?: boolean;
 };
 
 export type RunAgentLoopResult = {
@@ -63,13 +64,31 @@ export async function runAgentLoop(input: RunAgentLoopInput): Promise<RunAgentLo
         exploreReport: report,
       }),
     });
+    session = appendMessage(session, buildUserMessage(
+      `Above is the Explore subagent's findings. Now use these findings to fully answer the original question:\n${input.prompt}`,
+    ));
   }
 
   const maxIterations = input.maxIterations ?? 8;
+  const debug = input.debug ?? false;
 
   for (let iteration = 0; iteration < maxIterations; iteration += 1) {
     const messages = buildMessages(session.messages, budgetManager);
     messagesSentToMainModel.push(messages.map((message) => message.content).join("\n"));
+
+    if (debug) {
+      console.error(`\n===== [DEBUG] Iteration ${iteration} =====`);
+      console.error(`[DEBUG] Total session messages: ${session.messages.length}`);
+      console.error(`[DEBUG] Messages after budget clip: ${messages.length}`);
+      for (let i = 0; i < messages.length; i++) {
+        const msg = messages[i];
+        const contentPreview = typeof msg.content === "string"
+          ? msg.content.slice(0, 200)
+          : JSON.stringify(msg.content).slice(0, 200);
+        console.error(`[DEBUG]   [${i}] role=${msg.role} name=${msg.name ?? "-"} chars=${msg.content.length} preview=${contentPreview}`);
+      }
+      console.error(`[DEBUG] ===== end =====\n`);
+    }
     input.onProgress?.({
       type: "pending",
       scope: "main",
@@ -137,6 +156,9 @@ export async function runAgentLoop(input: RunAgentLoopInput): Promise<RunAgentLo
     }
 
     if (!sawToolUse) {
+      if (debug) {
+        console.error(`[DEBUG] No tool use in iteration ${iteration}, final text (${iterationText.length} chars): ${iterationText.slice(0, 300)}`);
+      }
       session = appendMessage(session, {
         role: "assistant",
         content: iterationText,

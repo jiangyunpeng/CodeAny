@@ -9,7 +9,7 @@ describe("system prompts", () => {
     expect(MAIN_AGENT_SYSTEM_PROMPT).toContain("list_files");
     expect(MAIN_AGENT_SYSTEM_PROMPT).toContain("diff_workspace");
     expect(MAIN_AGENT_SYSTEM_PROMPT).toContain("run_shell");
-    expect(MAIN_AGENT_SYSTEM_PROMPT).toContain("truncation metadata");
+    expect(MAIN_AGENT_SYSTEM_PROMPT).toContain("truncated, narrow the scope");
   });
 
   it("defines an explore prompt with read-only behavior", () => {

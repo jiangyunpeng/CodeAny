@@ -1,6 +1,7 @@
 import { ContextBudgetManager } from "../context/budget-manager";
 import { requiresApproval } from "../agent/approval";
 import { runCommand, type CommandResult } from "../utils/child-process";
+import { toErrorMessage } from "../utils/errors";
 import { listFilesTool } from "./list-files";
 import { readFileTool } from "./read-file";
 import { searchCodeTool } from "./search-code";
@@ -19,7 +20,7 @@ export type ToolName =
 
 export type ToolResultEnvelope = {
   toolName: ToolName;
-  status: "completed" | "requires_approval";
+  status: "completed" | "requires_approval" | "failed";
   rawOutput: string;
   modelVisibleOutput: string;
   truncation?: TruncationMeta;
@@ -80,8 +81,29 @@ export class ToolRegistry {
       };
     }
 
-    return tool(input, ctx);
+    try {
+      return await tool(input, ctx);
+    } catch (error) {
+      return buildFailedToolResult(name, error);
+    }
   }
+}
+
+function buildFailedToolResult(name: ToolName, error: unknown): ToolResultEnvelope {
+  const message = toErrorMessage(error);
+  const details = typeof error === "object" && error !== null ? error as Record<string, unknown> : {};
+
+  return {
+    toolName: name,
+    status: "failed",
+    rawOutput: message,
+    modelVisibleOutput: `Tool ${name} failed: ${message}`,
+    metadata: {
+      errorMessage: message,
+      errorName: typeof details.name === "string" ? details.name : undefined,
+      errorCode: typeof details.code === "string" ? details.code : undefined,
+    },
+  };
 }
 
 const TOOL_DEFINITIONS: Record<ToolName, ToolDefinition> = {

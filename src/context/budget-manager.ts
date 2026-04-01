@@ -34,7 +34,28 @@ export class ContextBudgetManager {
     };
   }
 
-  clipHistory<T>(messages: T[]): T[] {
-    return messages.slice(-this.budgets.maxHistoryMessages);
+  clipHistory<T extends { role: string }>(messages: T[]): T[] {
+    const max = this.budgets.maxHistoryMessages;
+    if (messages.length <= max) {
+      return messages;
+    }
+
+    // Always preserve the first user message (the original question)
+    const first = messages[0];
+    const hasUserFirst = first && first.role === "user";
+    const tailBudget = hasUserFirst ? max - 1 : max;
+
+    // Find a safe cut point: tail must not start with a "tool" message
+    // (which would be an orphan tool_result without its preceding assistant tool_use)
+    let cutIndex = messages.length - tailBudget;
+    while (cutIndex < messages.length && messages[cutIndex].role === "tool") {
+      cutIndex -= 1; // include the preceding assistant message
+    }
+
+    const tail = messages.slice(cutIndex);
+    if (hasUserFirst && cutIndex > 0) {
+      return [first, ...tail];
+    }
+    return tail;
   }
 }

@@ -42,6 +42,7 @@ async function main(): Promise<void> {
     toolContext,
     provider,
     yolo: config.yolo,
+    debug: config.debug,
   });
 }
 

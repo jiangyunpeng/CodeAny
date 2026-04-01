@@ -62,6 +62,9 @@ function formatToolDone(
   if (result.status === "requires_approval") {
     return formatApprovalRequired(name, inputData, metadata);
   }
+  if (result.status === "failed") {
+    return formatFailure(name, inputData, metadata, result.modelVisibleOutput);
+  }
 
   if (name === "search_code") {
     return formatCountSummary({
@@ -159,4 +162,31 @@ function formatApprovalRequired(
   }
 
   return `${name} requires approval`;
+}
+
+function formatFailure(
+  name: Extract<AgentProgressEvent, { type: "tool_done" }>["toolName"],
+  input: Record<string, unknown>,
+  metadata: Record<string, unknown>,
+  fallbackMessage: string,
+): string {
+  const errorMessage = stringValue(metadata.errorMessage) ?? fallbackMessage;
+
+  if (name === "read_file") {
+    return `Read ${stringValue(input.path) ?? "file"} failed: ${errorMessage}`;
+  }
+  if (name === "list_files") {
+    return `List files under ${stringValue(input.path) ?? "."} failed: ${errorMessage}`;
+  }
+  if (name === "search_code") {
+    return `Search for ${quoteValue(input.query)} failed: ${errorMessage}`;
+  }
+  if (name === "run_shell") {
+    return `Shell command ${quoteValue(stringValue(input.command) ?? "")} failed: ${errorMessage}`;
+  }
+  if (name === "write_file") {
+    return `Write ${stringValue(input.path) ?? "file"} failed: ${errorMessage}`;
+  }
+
+  return `${name} failed: ${errorMessage}`;
 }

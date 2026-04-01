@@ -55,7 +55,7 @@ function createSdkStreamFactory(input: {
   return (input) =>
     client.messages.stream({
       model: input.model,
-      max_tokens: 2_048,
+      max_tokens: 8_192,
       system: input.system,
       messages: input.messages.map((message) => {
         return {

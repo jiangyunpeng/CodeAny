@@ -70,4 +70,23 @@ describe("renderProgressLine", () => {
     expect(line).toContain("Write index.html requires approval");
     expect(line).not.toContain("Wrote index.html");
   });
+
+  it("shows tool failure details instead of a success summary", () => {
+    const line = renderProgressLine({
+      type: "tool_done",
+      scope: "main",
+      toolName: "read_file",
+      input: { path: "docs/missing.md" },
+      result: {
+        toolName: "read_file",
+        status: "failed",
+        rawOutput: "ENOENT: no such file or directory",
+        modelVisibleOutput: "Tool read_file failed: ENOENT: no such file or directory",
+      },
+    });
+
+    expect(line).toContain("Read docs/missing.md failed");
+    expect(line).toContain("ENOENT");
+    expect(line).not.toContain("Read docs/missing.md (");
+  });
 });

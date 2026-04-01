@@ -16,6 +16,7 @@ export type ReplRuntime = {
   toolContext: ToolContext;
   provider: Provider;
   yolo: boolean;
+  debug: boolean;
   onProgressLine?: (line: string, event: AgentProgressEvent) => void;
 };
 
@@ -78,6 +79,7 @@ export async function handleInputLine(
     registry: runtime.registry,
     toolContext: runtime.toolContext,
     exploreAgent: runExploreAgent,
+    debug: runtime.debug,
     onProgress: (event) => {
       runtime.onProgressLine?.(renderProgressLine(event), event);
     },
@@ -185,5 +187,6 @@ export function createDefaultReplRuntime(overrides?: Partial<ReplRuntime>): Repl
       },
     },
     yolo: overrides?.yolo ?? false,
+    debug: overrides?.debug ?? false,
   };
 }

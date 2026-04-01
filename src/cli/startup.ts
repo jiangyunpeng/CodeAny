@@ -34,6 +34,7 @@ export function formatHelpText(version: string): string {
     "  --approval <m>   Set approval mode",
     "  --cwd <path>     Set workspace root",
     "  --yolo           Auto-approve write_file and run_shell",
+    "  --debug          Print messages sent to model at each iteration",
     "",
     "Runtime:",
     "  Starts an interactive REPL when no exit flag is provided.",

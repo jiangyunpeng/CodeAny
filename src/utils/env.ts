@@ -13,6 +13,7 @@ export type AppConfig = {
   approvalMode: ApprovalMode;
   cwd: string;
   yolo: boolean;
+  debug: boolean;
 };
 
 export function loadAppConfig(options: {
@@ -54,6 +55,7 @@ export function loadAppConfig(options: {
     approvalMode: yolo ? "never" : approvalMode,
     cwd: flags.cwd ?? resolveDefaultWorkspaceRoot(options.cwd, env),
     yolo,
+    debug: flags.debug,
   };
 }
 
@@ -97,10 +99,11 @@ type ParsedFlags = {
   approval?: string;
   cwd?: string;
   yolo: boolean;
+  debug: boolean;
 };
 
 export function parseCliFlags(argv: string[]): ParsedFlags {
-  const result: ParsedFlags = { yolo: false };
+  const result: ParsedFlags = { yolo: false, debug: false };
 
   for (let index = 0; index < argv.length; index += 1) {
     const current = argv[index];
@@ -121,6 +124,9 @@ export function parseCliFlags(argv: string[]): ParsedFlags {
     }
     if (current === "--yolo") {
       result.yolo = true;
+    }
+    if (current === "--debug") {
+      result.debug = true;
     }
   }
 
