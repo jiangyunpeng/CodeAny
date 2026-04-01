@@ -124,11 +124,13 @@ export async function runReplScript(
 }
 
 export async function runInteractiveRepl(runtime: ReplRuntime): Promise<void> {
+  // 1. 创建 readline 接口，用于从标准输入读取用户输入并输出到标准输出
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
   });
 
+  // 2. 初始化运行时环境，设置进度输出回调函数（默认输出到控制台）
   let currentRuntime = runtime;
   currentRuntime = {
     ...currentRuntime,
@@ -136,6 +138,8 @@ export async function runInteractiveRepl(runtime: ReplRuntime): Promise<void> {
       console.log(line);
     }),
   };
+
+  // 3. 显示初始状态信息（模型、审批模式、yolo 模式等）
   console.log(renderStatusLine({
     model: runtime.session.model,
     approvalMode: runtime.session.approvalMode,
@@ -143,19 +147,26 @@ export async function runInteractiveRepl(runtime: ReplRuntime): Promise<void> {
   }));
 
   try {
+    // 4. 进入交互式循环，持续读取用户输入并处理
     while (true) {
+      // 4.1 显示提示符并等待用户输入
       const line = await rl.question("> ");
+      // 4.2 处理用户输入（可能是命令或对话内容）
       const result = await handleInputLine(line, currentRuntime);
+      // 4.3 输出处理结果
       console.log(result.output);
+      // 4.4 更新会话状态
       currentRuntime = {
         ...currentRuntime,
         session: result.session ?? currentRuntime.session,
       };
+      // 4.5 如果用户输入了退出命令，跳出循环
       if (result.exit) {
         break;
       }
     }
   } finally {
+    // 5. 清理资源，关闭 readline 接口
     rl.close();
   }
 }

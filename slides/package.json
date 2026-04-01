@@ -1,0 +1,12 @@
+{
+  "name": "code-any-slides",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Build deck for code-any source analysis",
+  "scripts": {
+    "build": "node build-code-any-analysis.cjs"
+  },
+  "dependencies": {
+    "pptxgenjs": "^4.0.1"
+  }
+}

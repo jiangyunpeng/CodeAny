@@ -37,6 +37,7 @@ export type RunAgentLoopResult = {
 };
 
 export async function runAgentLoop(input: RunAgentLoopInput): Promise<RunAgentLoopResult> {
+  // 1. 初始化会话状态和相关变量
   let session = appendMessage(input.session, buildUserMessage(input.prompt));
   let usedExplore = false;
   const task = shapeTask(input.prompt);
@@ -45,7 +46,9 @@ export async function runAgentLoop(input: RunAgentLoopInput): Promise<RunAgentLo
   const budgetManager = input.toolContext.budgetManager ?? new ContextBudgetManager();
   const exploreAgent = input.exploreAgent ?? runExploreAgent;
 
+  // 2. 判断是否需要使用 Explore 子代理进行上下文探索
   if (shouldUseExplore({ userInput: input.prompt })) {
+    // 2.1 运行 Explore 子代理，收集代码库上下文信息
     const report = await exploreAgent(
       task.rewrittenTask,
       input.toolContext,
@@ -54,28 +57,35 @@ export async function runAgentLoop(input: RunAgentLoopInput): Promise<RunAgentLo
       input.onProgress,
     );
     usedExplore = true;
+    // 2.2 将探索报告保存到会话状态
     session = {
       ...session,
       latestExploreReport: report,
     };
+    // 2.3 将探索结果添加到消息历史
     session = appendMessage(session, {
       role: "assistant",
       content: JSON.stringify({
         exploreReport: report,
       }),
     });
+    // 2.4 添加提示消息，引导主代理使用探索结果回答问题
     session = appendMessage(session, buildUserMessage(
       `Above is the Explore subagent's findings. Now use these findings to fully answer the original question:\n${input.prompt}`,
     ));
   }
 
+  // 3. 设置迭代参数
   const maxIterations = input.maxIterations ?? 8;
   const debug = input.debug ?? false;
 
+  // 4. 进入主循环，最多执行 maxIterations 次迭代
   for (let iteration = 0; iteration < maxIterations; iteration += 1) {
+    // 4.1 构建消息列表（应用上下文预算管理）
     const messages = buildMessages(session.messages, budgetManager);
     messagesSentToMainModel.push(messages.map((message) => message.content).join("\n"));
 
+    // 4.2 如果开启调试模式，输出详细的消息信息
     if (debug) {
       console.error(`\n===== [DEBUG] Iteration ${iteration} =====`);
       console.error(`[DEBUG] Total session messages: ${session.messages.length}`);
@@ -89,10 +99,14 @@ export async function runAgentLoop(input: RunAgentLoopInput): Promise<RunAgentLo
       }
       console.error(`[DEBUG] ===== end =====\n`);
     }
+
+    // 4.3 通知进度监听器：主代理正在等待响应
     input.onProgress?.({
       type: "pending",
       scope: "main",
     });
+
+    // 4.4 向 AI 模型发送请求
     const response = await input.provider.send({
       model: session.model,
       messages,
@@ -100,31 +114,39 @@ export async function runAgentLoop(input: RunAgentLoopInput): Promise<RunAgentLo
       tools: input.registry.listDefinitions(),
     });
 
+    // 4.5 初始化本次迭代的状态变量
     let sawToolUse = false;
     let sawDone = false;
     let iterationText = "";
 
+    // 4.6 处理模型响应的事件流
     for await (const event of response.events) {
+      // 4.6.1 处理文本响应事件
       if (event.type === "text") {
         iterationText += event.text;
         continue;
       }
 
+      // 4.6.2 处理工具调用事件
       if (event.type === "tool_use") {
         sawToolUse = true;
         const toolName = event.name as ToolName;
         toolCalls.push(toolName);
+        // 4.6.2.1 通知进度监听器：工具开始执行
         input.onProgress?.({
           type: "tool_start",
           scope: "main",
           toolName,
           input: event.input,
         });
+        // 4.6.2.2 将工具调用消息添加到会话
         session = appendMessage(session, buildAssistantToolUseMessage({
           ...event,
           preambleText: iterationText,
         }));
+        // 4.6.2.3 执行工具
         const toolResult = await input.registry.execute(toolName, event.input, input.toolContext);
+        // 4.6.2.4 通知进度监听器：工具执行完成
         input.onProgress?.({
           type: "tool_done",
           scope: "main",
@@ -132,8 +154,10 @@ export async function runAgentLoop(input: RunAgentLoopInput): Promise<RunAgentLo
           input: event.input,
           result: toolResult,
         });
+        // 4.6.2.5 将工具结果添加到会话
         session = appendToolResult(session, toolResult);
         session = appendMessage(session, buildToolResultMessage(toolResult, event.toolUseId));
+        // 4.6.2.6 如果工具需要审批，提前返回
         if (toolResult.status === "requires_approval") {
           const finalText = buildApprovalRequiredMessage(toolName, event.input, input.toolContext.approvalMode);
           session = appendMessage(session, {
@@ -150,15 +174,18 @@ export async function runAgentLoop(input: RunAgentLoopInput): Promise<RunAgentLo
         }
       }
 
+      // 4.6.3 处理完成事件
       if (event.type === "done") {
         sawDone = true;
       }
     }
 
+    // 4.7 如果本次迭代没有工具调用，说明代理已完成任务
     if (!sawToolUse) {
       if (debug) {
         console.error(`[DEBUG] No tool use in iteration ${iteration}, final text (${iterationText.length} chars): ${iterationText.slice(0, 300)}`);
       }
+      // 4.7.1 将最终文本添加到会话并退出循环
       session = appendMessage(session, {
         role: "assistant",
         content: iterationText,
@@ -167,9 +194,11 @@ export async function runAgentLoop(input: RunAgentLoopInput): Promise<RunAgentLo
     }
   }
 
+  // 5. 提取最终的助手回复文本
   const finalAssistantMessage = [...session.messages].reverse().find((message) => message.role === "assistant");
   const finalText = finalAssistantMessage?.content ?? "";
 
+  // 6. 返回执行结果
   return {
     finalText,
     toolCalls,
